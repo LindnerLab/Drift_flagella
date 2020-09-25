@@ -95,6 +95,7 @@ for k = 1 : numFiles
     f = fit(X.',Means.','gauss1');
     plot(f,X,Means)
     hold off
+    close
     % FIT VALUES -------------------------------------------
     %Means = smoothdata(Means,'gaussian',100);
     FMeans = f(X);
@@ -165,6 +166,38 @@ hold off
 saveas(gcf,'Indexmax=f(framenb)','pdf');
 saveas(gcf,'Indexmax=f(framenb)','fig');
 %title(strcat('2D Intensity plot, ', Smoothingmethod,smoothingdegree));
+
+% PLOTTING A FIGURE WITH ONLY A FEW INTENSITY PROFILES (REPRESENTATIVE)
+% figure()
+% hold on
+% plot(X,FDatamean{86})
+% plot(X,FDatamean{190})
+% plot(X,FDatamean{316})
+% plot(X,FDatamean{442})
+% plot(X,FDatamean{604})
+% plot(X,FDatamean{706})
+% xl1 = xline(FDataindexmax(86),'b:',FDataindexmax(50));
+% xl2 = xline(FDataindexmax(190),'b:',FDataindexmax(96));
+% xl3 = xline(FDataindexmax(316),'b:',FDataindexmax(165));
+% xl4 = xline(FDataindexmax(442),'b:',FDataindexmax(320));
+% xl5 = xline(FDataindexmax(604),'b:',FDataindexmax(350));
+% xl6 = xline(FDataindexmax(706),'b:',FDataindexmax(350));
+% xl1.LabelVerticalAlignment = 'middle';
+% xl1.LabelHorizontalAlignment = 'center';
+% xl2.LabelVerticalAlignment = 'middle';
+% xl2.LabelHorizontalAlignment = 'center';
+% xl3.LabelVerticalAlignment = 'middle';
+% xl3.LabelHorizontalAlignment = 'center';
+% xl4.LabelVerticalAlignment = 'middle';
+% xl4.LabelHorizontalAlignment = 'center';
+% xl5.LabelVerticalAlignment = 'middle';
+% xl5.LabelHorizontalAlignment = 'center';
+% xl6.LabelVerticalAlignment = 'middle';
+% xl6.LabelHorizontalAlignment = 'center';
+% xlabel('Frame n°')
+% ylabel('Intensity')
+% legend('img86','img190','img316','img442','img604','img706')
+% hold off
 
 %% STACKED IMAGE: 2D-profile = equiv. of the average on each xi of the 3D-profile
 % close all
