@@ -75,7 +75,7 @@ Dataglobalstd=[];
 Dataindexmax=[];
 Dataminusix=[];
 Dataplusix=[];
-% Loop over all files reading them in and plotting them.
+% Loop over all files reading them and plotting them.
 for k = 1 : numFiles
     fprintf('Now reading file %s\n', fullFileNames{k});
     Im = imread(fds.Files{k});
@@ -89,16 +89,54 @@ for k = 1 : numFiles
         Stds(p) = std(Vectors{p,1});
     end
     % TEST
+    % WITH VISUAL DETERMINATION
     figure()
     hold on
     plot(X,Means)
-    f = fit(X.',Means.','gauss1');
-    plot(f,X,Means)
-    hold off
+%     input_threshstart = input('Where do you want to start your fit? \n');
+%     input_threshend = input('Where do you want to end your fit? \n');
+%     Excludedpoints = input_threshstart+(length(X)-input_threshend)-1;
+%     NewX = X(input_threshstart:input_threshend);
+%     NewMeans = Means(input_threshstart:input_threshend);
+%     [fitobject,gof] = fit(NewX.',NewMeans.','gauss1');
+%     display(gof.rsquare)
+%     plot(fitobject,X,Means)
+    % WITH FIXED THRESHOLDS
+    Startpoints=[];
+    Endpoints=[];
+    Startpoints(1) = 1;
+    Startpoints(2) = round(length(X)*10/100);
+    Startpoints(3) = round(length(X)*20/100);
+    Startpoints(4) = round(length(X)*30/100);
+%     Startpoints(5) = round(length(X)*50/100);
+    Endpoints(1) = length(X);
+    Endpoints(2) = round(length(X)-length(X)*10/100);
+    Endpoints(3) = round(length(X)-(length(X)*20/100));
+    Endpoints(4) = round(length(X)-(length(X)*30/100));
+%     Endpoints(5) = length(X);
+    NewX={};
+    NewMeans={};
+    fitobject={};
+    gof={};
+    R2=[];
+    for m = 1:4
+%         for n = 1:4
+        NewX{m}=X(Startpoints(m):Endpoints(m));
+        NewMeans{m}=Means(Startpoints(m):Endpoints(m));
+        [fitobject{m},gof{m}] = fit(NewX{m}.',NewMeans{m}.','gauss1');
+        R2(m)=gof{m}.rsquare;
+%         end
+    end
+    [BestR2,Index]=max(R2);
+    Chosenfit=fitobject{Index};
+    Chosenrange=NewX{Index};
+    Chosenvalues=NewMeans{Index};
+    plot(Chosenfit,Chosenrange,Chosenvalues)
     close
+    FMeans=Chosenvalues;
     % FIT VALUES -------------------------------------------
     %Means = smoothdata(Means,'gaussian',100);
-    FMeans = f(X);
+%     FMeans = fitobject(X);
     FGlobalmax = max(FMeans); % maximal mean value
     FGlobalstd = std(FMeans); % distribution of mean values
     FIndexmax = find(FMeans==FGlobalmax); % Index of the maximum
@@ -136,7 +174,15 @@ figure()
 hold on
 for k=1:numFiles
     plot(X, Datamean{k})
-    plot(X, FDatamean{k})
+    if length(FDatamean{k})==length(NewX{1})
+        plot(NewX{1}, FDatamean{k})
+    elseif length(FDatamean{k})==length(NewX{2})
+        plot(NewX{2}, FDatamean{k})
+    elseif length(FDatamean{k})==length(NewX{3})
+        plot(NewX{3}, FDatamean{k})
+    else
+        plot(NewX{4},FDatamean{k})
+    end
 end
 xlabel('Frame n°');
 ylabel('Intensity');
@@ -168,36 +214,32 @@ saveas(gcf,'Indexmax=f(framenb)','fig');
 %title(strcat('2D Intensity plot, ', Smoothingmethod,smoothingdegree));
 
 % PLOTTING A FIGURE WITH ONLY A FEW INTENSITY PROFILES (REPRESENTATIVE)
-% figure()
-% hold on
-% plot(X,FDatamean{86})
-% plot(X,FDatamean{190})
-% plot(X,FDatamean{316})
-% plot(X,FDatamean{442})
-% plot(X,FDatamean{604})
-% plot(X,FDatamean{706})
-% xl1 = xline(FDataindexmax(86),'b:',FDataindexmax(50));
-% xl2 = xline(FDataindexmax(190),'b:',FDataindexmax(96));
-% xl3 = xline(FDataindexmax(316),'b:',FDataindexmax(165));
-% xl4 = xline(FDataindexmax(442),'b:',FDataindexmax(320));
-% xl5 = xline(FDataindexmax(604),'b:',FDataindexmax(350));
-% xl6 = xline(FDataindexmax(706),'b:',FDataindexmax(350));
-% xl1.LabelVerticalAlignment = 'middle';
-% xl1.LabelHorizontalAlignment = 'center';
-% xl2.LabelVerticalAlignment = 'middle';
-% xl2.LabelHorizontalAlignment = 'center';
-% xl3.LabelVerticalAlignment = 'middle';
-% xl3.LabelHorizontalAlignment = 'center';
-% xl4.LabelVerticalAlignment = 'middle';
-% xl4.LabelHorizontalAlignment = 'center';
-% xl5.LabelVerticalAlignment = 'middle';
-% xl5.LabelHorizontalAlignment = 'center';
-% xl6.LabelVerticalAlignment = 'middle';
-% xl6.LabelHorizontalAlignment = 'center';
-% xlabel('Frame n°')
-% ylabel('Intensity')
-% legend('img86','img190','img316','img442','img604','img706')
-% hold off
+figure()
+hold on
+plot(X,FDatamean{30})
+plot(X,FDatamean{70})
+plot(X,FDatamean{120})
+plot(X,FDatamean{170})
+plot(X,FDatamean{210})
+xl1 = xline(FDataindexmax(30),'b:',FDataindexmax(30));
+xl2 = xline(FDataindexmax(70),'b:',FDataindexmax(70));
+xl3 = xline(FDataindexmax(120),'b:',FDataindexmax(120));
+xl4 = xline(FDataindexmax(170),'b:',FDataindexmax(170));
+xl5 = xline(FDataindexmax(210),'b:',FDataindexmax(210));
+xl1.LabelVerticalAlignment = 'middle';
+xl1.LabelHorizontalAlignment = 'center';
+xl2.LabelVerticalAlignment = 'middle';
+xl2.LabelHorizontalAlignment = 'center';
+xl3.LabelVerticalAlignment = 'middle';
+xl3.LabelHorizontalAlignment = 'center';
+xl4.LabelVerticalAlignment = 'middle';
+xl4.LabelHorizontalAlignment = 'center';
+xl5.LabelVerticalAlignment = 'middle';
+xl5.LabelHorizontalAlignment = 'center';
+xlabel('Frame n°')
+ylabel('Intensity')
+legend('img30','img70','img120','img170','img210')
+hold off
 
 %% STACKED IMAGE: 2D-profile = equiv. of the average on each xi of the 3D-profile
 % close all
