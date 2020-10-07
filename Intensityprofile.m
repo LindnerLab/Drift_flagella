@@ -75,6 +75,9 @@ Dataglobalstd=[];
 Dataindexmax=[];
 Dataminusix=[];
 Dataplusix=[];
+Chosenfit={};
+Chosenrange={};
+Chosenvalues={};
 % Loop over all files reading them and plotting them.
 for k = 1 : numFiles
     fprintf('Now reading file %s\n', fullFileNames{k});
@@ -108,38 +111,45 @@ for k = 1 : numFiles
     Startpoints(2) = round(length(X)*10/100);
     Startpoints(3) = round(length(X)*20/100);
     Startpoints(4) = round(length(X)*30/100);
-%     Startpoints(5) = round(length(X)*50/100);
     Endpoints(1) = length(X);
     Endpoints(2) = round(length(X)-length(X)*10/100);
     Endpoints(3) = round(length(X)-(length(X)*20/100));
     Endpoints(4) = round(length(X)-(length(X)*30/100));
-%     Endpoints(5) = length(X);
     NewX={};
     NewMeans={};
     fitobject={};
     gof={};
     R2=[];
     for m = 1:4
-%         for n = 1:4
-        NewX{m}=X(Startpoints(m):Endpoints(m));
-        NewMeans{m}=Means(Startpoints(m):Endpoints(m));
-        [fitobject{m},gof{m}] = fit(NewX{m}.',NewMeans{m}.','gauss1');
-        R2(m)=gof{m}.rsquare;
-%         end
+        for n = 1:4
+            NewX{m,n}=X(Startpoints(m):Endpoints(n));
+            NewMeans{m,n}=Means(Startpoints(m):Endpoints(n));
+            [fitobject{m,n},gof{m,n}] = fit(NewX{m,n}.',NewMeans{m,n}.','gauss1');
+            R2(m,n)=gof{m,n}.rsquare;
+        end
     end
-    [BestR2,Index]=max(R2);
-    Chosenfit=fitobject{Index};
-    Chosenrange=NewX{Index};
-    Chosenvalues=NewMeans{Index};
-    plot(Chosenfit,Chosenrange,Chosenvalues)
+    M = max(R2,[],'all');
+    [mo,no]=find(R2==M);
+    Chosenfit{k}=fitobject{mo,no};
+    Chosenrange{k}=NewX{mo,no};
+    Chosenvalues{k}=NewMeans{mo,no};
+    plot(Chosenfit{k},Chosenrange{k},Chosenvalues{k})
     close
-    FMeans=Chosenvalues;
+    FMeans=Chosenfit{k}(Chosenrange{k});
     % FIT VALUES -------------------------------------------
     %Means = smoothdata(Means,'gaussian',100);
 %     FMeans = fitobject(X);
     FGlobalmax = max(FMeans); % maximal mean value
     FGlobalstd = std(FMeans); % distribution of mean values
-    FIndexmax = find(FMeans==FGlobalmax); % Index of the maximum
+    if mo ==1
+        FIndexmax = find(FMeans==FGlobalmax); % Index of the maximum
+    elseif mo == 2
+        FIndexmax = find(FMeans==FGlobalmax)+205;
+    elseif mo == 3
+        FIndexmax = find(FMeans==FGlobalmax)+410;
+    else
+        FIndexmax = find(FMeans==FGlobalmax)+614;
+    end
     FMinus = FGlobalmax-FGlobalstd; % Index of the std on both sides
     [F_lowvalue, FMinusix] = min(abs(FMeans-FMinus));
     FPlusix = FIndexmax + (FIndexmax-FMinusix);
@@ -174,15 +184,7 @@ figure()
 hold on
 for k=1:numFiles
     plot(X, Datamean{k})
-    if length(FDatamean{k})==length(NewX{1})
-        plot(NewX{1}, FDatamean{k})
-    elseif length(FDatamean{k})==length(NewX{2})
-        plot(NewX{2}, FDatamean{k})
-    elseif length(FDatamean{k})==length(NewX{3})
-        plot(NewX{3}, FDatamean{k})
-    else
-        plot(NewX{4},FDatamean{k})
-    end
+    plot(Chosenrange{k},FDatamean{1,k})
 end
 xlabel('Frame n°');
 ylabel('Intensity');
@@ -216,11 +218,11 @@ saveas(gcf,'Indexmax=f(framenb)','fig');
 % PLOTTING A FIGURE WITH ONLY A FEW INTENSITY PROFILES (REPRESENTATIVE)
 figure()
 hold on
-plot(X,FDatamean{30})
-plot(X,FDatamean{70})
-plot(X,FDatamean{120})
-plot(X,FDatamean{170})
-plot(X,FDatamean{210})
+plot(Chosenfit{30}, Chosenrange{30},FDatamean{1,30})
+plot(Chosenfit{70}, Chosenrange{70},FDatamean{1,70})
+plot(Chosenfit{120}, Chosenrange{120},FDatamean{1,120})
+plot(Chosenfit{170}, Chosenrange{170},FDatamean{1,170})
+plot(Chosenfit{210}, Chosenrange{210},FDatamean{1,210})
 xl1 = xline(FDataindexmax(30),'b:',FDataindexmax(30));
 xl2 = xline(FDataindexmax(70),'b:',FDataindexmax(70));
 xl3 = xline(FDataindexmax(120),'b:',FDataindexmax(120));
