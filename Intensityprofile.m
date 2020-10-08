@@ -1,112 +1,73 @@
-%% VERTICAL INTENSITY PROFILES OVER GREY STACK IMAGES %%
+%% QUANTIFICATION OF THE MIGRATION (DRIFT) OF FLUORESCENT FLAGELLA AS A FUNCTION OF Z - IMAGE SEQUENCE
+%
+%~~~~~  GENERAL DESCRIPTION   : 
+%
+% *  READ AN IMAGE SEQUENCE (FLAGELLA SUSPENSION IMAGED OVER Z, MAX. 750 IMG)
+% *  FOR EACH IMAGE OF THE SEQUENCE (ASSUMING A POTENTIAL DRIFT IN Y):
+%    ** ESTABLISH A MEAN INTENSITY PROFILE ALONG X
+%    ** ESTABLISH A GAUSSIAN FIT OF THE MEAN INTENSITY PROFILE
+%    ** PLOT THE MEAN INTENSITY PROFILE WITH ITS FIT, THEN CLOSE IT
+%    ** RAW VALUES AND FIT VALUES ARE SAVED (BOTH ORDINATE AND ABSCISSA RANGES)
+% *  PLOT ALL MEAN INTENSITY PROFILES (RAW AND FITS)
+% *  PLOT ALL PIXEL INDICES CORRESPONDING TO THE CENTERS OF INTENSITY DISTRIBUTIONS OVER TIME (POTENTIAL DRIFT)
+% *  PLOT REPRESENTATIVE DISTRIBUTIONS (BOTTOM, CENTER, AND TOP) AND THEIR CENTERS (RAWS AND FITS)
+%
+% IMPORTANT NOTES:
+%       -IMAGE SEQUENCES NEED TO BE OPTIMIZED USING IMAGEJ BEFORE USING THIS CODE. SEE PROTOCOLE "DRIFT EXPERIMENT".
+%       -BOTH FILES INTENSITYPROFILE.M AND MAT2TILES.M NEED TO BE PLACED IN THE IMAGE SEQUENCE FOLDER.
+%       -MAKE SURE YOUR MATLAB DIRECTORY IS THE FOLDER CONTAINING THESE THREE FILES.
+%
+%% CODE
 
-%% Draw a line over the image and plot intensity profile
-
-% basepath = 'D:\2020-09-11\1.1. L1 X=-2070\10h34m05s';
-% Image = imread(strcat(basepath,'SUM_745_20.jpg')); % reading img
-% 
-% imshow(Image,[]); % showing image
-% 
-% improfile
-
-%% 3D-intensity profile of an entire image
-% 
-% basepath = 'D:\2020-09-11\1.1. L1 X=-2070\10h34m05s\';
-% Im=imread(strcat(basepath,'SUM_745.jpg'));
-% 
-% % Size of the image and meshing; 3D-plot display;
-% [x,y]=size(Im);
-% X=1:x;
-% Y=1:y;
-% [xx,yy]=meshgrid(Y,X);
-% i=im2double(Im);
-% figure;mesh(xx,yy,i);
-% saveas(gcf,'3Dplot_intensity','pdf');
-% saveas(gcf,'3Dplot_intensity','fig');
-% colorbar
-% 
-% % Maximal values and corresponding indices (pixel position) of the entire image stored in Max and Index
-% [Max,Index] = max(i);
-% Mean = mean(Index); % average index where pixel values reaches a maximum
-% Std = std(Index);
-% %Stderr = std(Index)/sqrt(length(Index)); % how is the spread around the index peak
-% lowbar = Mean-Std;
-% highbar = Mean + Std;
-% 
-% % Displaying max index value and distribution around peak on the figure
-% x1 = [1024 1024];
-% y2 = [0 size(Im,1)];
-% c = improfile(Im,x1,y2);
-% figure
-% subplot(2,1,1)
-% imshow(Im);
-% hold on
-% plot(x1,y2,'r')
-% subplot(2,1,2)
-% plot(c(:,1,1),'r')
-% hold on
-% xl1 = xline(mean(Index),'k',mean(Index));
-% xl1.LabelVerticalAlignment = 'middle';
-% xl1.LabelHorizontalAlignment = 'center';
-% xl2 = xline(lowbar,'b',lowbar);
-% xl2.LabelVerticalAlignment = 'top';
-% xl2.LabelHorizontalAlignment = 'left';
-% xl3 = xline(highbar,'b',highbar);
-% xl3.LabelVerticalAlignment = 'bottom';
-% xl3.LabelHorizontalAlignment = 'right';
-% hold off
-% saveas(gcf,'2Dintensityplot_mean-and-std','pdf');
-% saveas(gcf,'2Dintensityplot_mean-and-std','fig');
-
-%% SEQUENCE OF IMAGES: 2D-profile = equiv. of the average on each xi of the 3D-profile
-
-close all
-
-%Get a list of all txt files in the current folder, or subfolders of it.
+% GET A LIST OF ALL .JPG FILES IN THE CURRENT FOLDER OR/AND SUBFOLDERS
 fds = fileDatastore('*.jpg', 'ReadFcn', @importdata);
-fullFileNames = fds.Files;
-numFiles = length(fullFileNames);
+fullFileNames = fds.Files; % Names of .jpg files
+numFiles = length(fullFileNames); % Total number of .jpg files
 
-% Initializing matrices
-Datamean={};
-Datastds={};
-Dataglobalmax=[];
-Dataglobalstd=[];
-Dataindexmax=[];
-Dataminusix=[];
-Dataplusix=[];
-Chosenfit={};
-Chosenrange={};
-Chosenvalues={};
-% Loop over all files reading them and plotting them.
+% INITIALIZING MATRICES
+% * RAW VALUES ----------------------------------------------------------
+Datamean={}; % Intensity value ranges (for each image)
+Datastds={}; % Standard deviations (for each image, standard deviation to the mean values)
+Dataglobalmax=[]; % Maximal intensity value (by image, for all images)
+Dataglobalstd=[]; % Standard deviation around the maximal intensity value (for all images)
+Dataindexmax=[]; % Corresponding pixel index of the maximal intensity value (for all images)
+Dataminusix=[]; % Lowest pixel index bound (standard deviation around the indexmax)
+Dataplusix=[]; % Highest pixel index bound (standard deviation around the indexmax)
+% * FIT VALUES ----------------------------------------------------------
+FDatamean={}; % Intensity value ranges (for each image)
+FDataglobalmax=[]; % Maximal intensity value (by image, for all images)
+FDataglobalstd=[]; % Standard deviation around the maximal intensity value (for all images)
+FDataindexmax=[]; % Corresponding pixel index of the maximal intensity value (for all images)
+FDataminusix=[]; % Lowest pixel index bound (standard deviation around the indexmax)
+FDataplusix=[]; % Highest pixel index bound (standard deviation around the indexmax)
+% * FIT VALUES AFTER OPTIMIZATION ---------------------------------------
+NewX={}; % Tested abscissa ranges for fits (same as X, -10%, -20%, -30%)
+NewMeans={}; % Tested ordinate ranges for fits (same as X, -10%, -20%, -30%)
+fitobject={}; % Fits corresponding to the different ranges tested
+gof={}; % Estimating the goodness of all fitobjects
+R2=[]; % vector containing all gof.rsquare for a given image (renewed for each image)
+Chosenfit={}; % Best fit (selected) by image
+Chosenrange={}; % Best abscissa range by image
+Chosenvalues={}; % Best ordinate range by image
+Startpoints=[]; % Tested startpoints for abscissa / ordinate ranges (renewed for each image based on image size)
+Endpoints=[]; % Tested endpoints for abscissa / ordinate ranges (renewed for each image based on image size)
+
+% FOR EACH IMAGE
+% * ESTABLISH A MEAN INTENSITY PROFILE ALONG X
 for k = 1 : numFiles
     fprintf('Now reading file %s\n', fullFileNames{k});
     Im = imread(fds.Files{k});
-    [x,y]=size(Im);
-    X = 1:x;
-    Y = 1:y;
-    i= im2double(Im);
-    Vectors = mat2tiles(i,[1,y]);
+    [x,y]=size(Im); % Image grid (for example 2048 x 2048)
+    X = 1:x; % Vector containing each pixel along any line on the image (NB: that only works for SQUARE IMAGES)
+    i= im2double(Im); % intensity value of each pixel (matrix)
+    Vectors = mat2tiles(i,[1,y]); % Gathering pixel intensity values by vertical line (1 column of this matrix = 1 vertical line in the image)
     for p = 1:x
-        Means(p) = mean(Vectors{p,1});
-        Stds(p) = std(Vectors{p,1});
+        Means(p) = mean(Vectors{p,1}); % Averaging intensity values over X for a given position in Y
+        Stds(p) = std(Vectors{p,1}); % Standard deviation when averaging over X for a given position in Y
     end
-    % TEST
-    % WITH VISUAL DETERMINATION
-    figure()
-    hold on
-    plot(X,Means)
-%     input_threshstart = input('Where do you want to start your fit? \n');
-%     input_threshend = input('Where do you want to end your fit? \n');
-%     Excludedpoints = input_threshstart+(length(X)-input_threshend)-1;
-%     NewX = X(input_threshstart:input_threshend);
-%     NewMeans = Means(input_threshstart:input_threshend);
-%     [fitobject,gof] = fit(NewX.',NewMeans.','gauss1');
-%     display(gof.rsquare)
-%     plot(fitobject,X,Means)
-    % WITH FIXED THRESHOLDS
-    Startpoints=[];
-    Endpoints=[];
+    
+% * ESTABLISH A GAUSSIAN FIT OF THE MEAN INTENSITY PROFILE
+% ** TESTED STARTING AND ENDING FIT POINTS ------------------------------
     Startpoints(1) = 1;
     Startpoints(2) = round(length(X)*10/100);
     Startpoints(3) = round(length(X)*20/100);
@@ -115,60 +76,45 @@ for k = 1 : numFiles
     Endpoints(2) = round(length(X)-length(X)*10/100);
     Endpoints(3) = round(length(X)-(length(X)*20/100));
     Endpoints(4) = round(length(X)-(length(X)*30/100));
-    NewX={};
-    NewMeans={};
-    fitobject={};
-    gof={};
-    R2=[];
+% All startpoints and endpoints can be tested with one another (ex: Startpoints(1) with Endpoints(4))
+
+% ** TESTED FITS AND RANGES ---------------------------------------------
     for m = 1:4
         for n = 1:4
-            NewX{m,n}=X(Startpoints(m):Endpoints(n));
-            NewMeans{m,n}=Means(Startpoints(m):Endpoints(n));
-            [fitobject{m,n},gof{m,n}] = fit(NewX{m,n}.',NewMeans{m,n}.','gauss1');
-            R2(m,n)=gof{m,n}.rsquare;
+            NewX{m,n}=X(Startpoints(m):Endpoints(n)); % Abscissa ranges to test
+            NewMeans{m,n}=Means(Startpoints(m):Endpoints(n)); % Ordinate ranges to test
+            % Fitobject records fits characteristics (parameters of the fit function)
+            % Gof = "Goodness of fit" parameters (records the fit rsquare for example). 
+            [fitobject{m,n},gof{m,n}] = fit(NewX{m,n}.',NewMeans{m,n}.','gauss1');  
+            R2(m,n)=gof{m,n}.rsquare; % Matrix containing the rsquares of all fits tested on a given intensity profile
         end
     end
-    M = max(R2,[],'all');
-    [mo,no]=find(R2==M);
-    Chosenfit{k}=fitobject{mo,no};
-    Chosenrange{k}=NewX{mo,no};
-    Chosenvalues{k}=NewMeans{mo,no};
+    
+% ** SELECTING THE BEST FIT AND RANGES-----------------------------------    
+    M = max(R2,[],'all'); % Finding the maximum rsquare
+    [mo,no]=find(R2==M); % Finding the corresponding indices of the Startpoints and Endpoints
+    Chosenfit{k}=fitobject{mo,no}; % Selecting the fit corresponding to this rsquare
+    Chosenrange{k}=NewX{mo,no}; % Selecting the X range corresponding to this rsquare (pixels)
+    Chosenvalues{k}=NewMeans{mo,no}; % Selecting the Y range corresponding to this rsquare (intensity)
+    
+% ** PLOTTING MEAN INTENSITY PROFILE AND ITS BEST FIT ------------------- 
+    figure()
+    hold on
+    plot(X,Means)
     plot(Chosenfit{k},Chosenrange{k},Chosenvalues{k})
+    hold off
     close
-    FMeans=Chosenfit{k}(Chosenrange{k});
-    % FIT VALUES -------------------------------------------
-    %Means = smoothdata(Means,'gaussian',100);
-%     FMeans = fitobject(X);
-    FGlobalmax = max(FMeans); % maximal mean value
-    FGlobalstd = std(FMeans); % distribution of mean values
-    if mo ==1
-        FIndexmax = find(FMeans==FGlobalmax); % Index of the maximum
-    elseif mo == 2
-        FIndexmax = find(FMeans==FGlobalmax)+205;
-    elseif mo == 3
-        FIndexmax = find(FMeans==FGlobalmax)+410;
-    else
-        FIndexmax = find(FMeans==FGlobalmax)+614;
-    end
-    FMinus = FGlobalmax-FGlobalstd; % Index of the std on both sides
-    [F_lowvalue, FMinusix] = min(abs(FMeans-FMinus));
-    FPlusix = FIndexmax + (FIndexmax-FMinusix);
-    % RAW VALUES -------------------------------------------
-    %Means = smoothdata(Means,'gaussian',100);
-    Globalmax = max(Means); % maximal mean value
-    Globalstd = std(Means); % distribution of mean values
-    Indexmax = find(Means==Globalmax); % Index of the maximum
+
+% * SAVING RAW AND FIT VALUES
+% ** RAW VALUES
+%           FOR EACH IMAGE ----------------------------------------------
+    Globalmax = max(Means); % Maximal intensity value
+    Globalstd = std(Means); % Standard deviation of the intensity distribution
+    Indexmax = find(Means==Globalmax); % Index (pixel number) of the maximal intensity value
     Minus = Globalmax-Globalstd; % Index of the std on both sides
-    [lowvalue, Minusix] = min(abs(Means-Minus));
-    Plusix = Indexmax + (Indexmax-Minusix);
-    % FIT ARRAYS --------------------------------------------
-    FDatamean{k}=FMeans;
-    FDataglobalmax(k)=FGlobalmax;
-    FDataglobalstd(k)=FGlobalstd;
-    FDataindexmax(k)=FIndexmax;
-    FDataminusix(k)=FMinusix;
-    FDataplusix(k)=FPlusix;
-    % RAW ARRAYS --------------------------------------------
+    [lowvalue, Minusix] = min(abs(Means-Minus)); % Minusix = lowest index of the standard deviation 
+    Plusix = Indexmax + (Indexmax-Minusix); % Plusix = highest index of the standard deviation
+%           FOR ALL IMAGES (ARRAYS) -------------------------------------
     Datamean{k}=Means;
     Datastds{k}=Stds;
     Dataglobalmax(k)=Globalmax;
@@ -176,23 +122,62 @@ for k = 1 : numFiles
     Dataindexmax(k)=Indexmax;
     Dataminusix(k)=Minusix;
     Dataplusix(k)=Plusix;
+%
+% ** FIT VALUES 
+%           FOR EACH IMAGE ----------------------------------------------
+    FMeans=Chosenfit{k}(Chosenrange{k}); % Fit values on the chosen range
+    FGlobalmax = max(FMeans); % Maximal fit value
+    FGlobalstd = std(FMeans); % Standard deviation of fit values
+    % Depending on the Startpoint chosen, the real indices of the fit are "drifted"
+    if mo ==1
+        FIndexmax = find(FMeans==FGlobalmax); % Startpoint = the beginning of the sequence
+    elseif mo == 2
+        FIndexmax = find(FMeans==FGlobalmax)+205; % Startpoint = 10% further than the beginning of the sequence
+    elseif mo == 3
+        FIndexmax = find(FMeans==FGlobalmax)+410; % Startpoint = 20% further than the beginning of the sequence
+    else
+        FIndexmax = find(FMeans==FGlobalmax)+614; % Startpoint = 30% further than the beginning of the sequence
+    end
+    FMinus = FGlobalmax-FGlobalstd; % Index (pixel number) of the standard deviation on both sides
+    [F_lowvalue, FMinusix] = min(abs(FMeans-FMinus)); % FMinusix = lowest index of the standard deviation
+    FPlusix = FIndexmax + (FIndexmax-FMinusix); % FPlusix = highest index of the standard deviation
+%           FOR ALL IMAGES (ARRAYS) -------------------------------------
+    FDatamean{k}=FMeans;
+    FDataglobalmax(k)=FGlobalmax;
+    FDataglobalstd(k)=FGlobalstd;
+    FDataindexmax(k)=FIndexmax;
+    FDataminusix(k)=FMinusix;
+    FDataplusix(k)=FPlusix;
+    
 end
 
-% PLOTTING MEANS
+% PLOTTING RAW MEANS
 T = 1:numFiles;
 figure()
 hold on
 for k=1:numFiles
     plot(X, Datamean{k})
+end
+xlabel('Frame n°');
+ylabel('Intensity');
+title(strcat('Mean intensity profiles');
+hold off
+saveas(gcf,'Raw_Meanprofiles','pdf');
+saveas(gcf,'Raw_Meanprofiles','fig');
+
+% PLOTTING FIT MEANS
+T = 1:numFiles;
+figure()
+hold on
+for k=1:numFiles
     plot(Chosenrange{k},FDatamean{1,k})
 end
 xlabel('Frame n°');
 ylabel('Intensity');
-legend('Raw data','Fitted data');
-%title(strcat('2D Intensity plot, ', Smoothingmethod,smoothingdegree));
+title(strcat('Mean intensity profiles');
 hold off
-saveas(gcf,'2Dplot_mean-and-std','pdf');
-saveas(gcf,'2Dplot_mean-and-std','fig');
+saveas(gcf,'Fit_Meanprofiles','pdf');
+saveas(gcf,'Fit_Meanprofiles','fig');
 
 % PLOTTING INDICES
 figure()
@@ -203,114 +188,70 @@ plot(T, Dataindexmax)
 plot(T, Dataindexmax_smooth)
 plot(T, FDataindexmax)
 plot(T, FDataindexmax_smooth)
-Maxsmooth = sprintf('%.1f',max(Dataindexmax_smooth));
+Maxsmooth = sprintf('%.1f',max(Dataindexmax_smooth)); % Convert number to text and keeping one decimal
 Minsmooth = sprintf('%.1f',min(Dataindexmax_smooth));
 yline(max(Dataindexmax_smooth),'r',strcat('Right max:',Maxsmooth));
 yline(min(Dataindexmax_smooth),'r',strcat('Left max:',Minsmooth));
 xlabel('Frame n°');
-ylabel('Index corresponding to the maximal intensity obtained on a given frame');
+ylabel('Index (pixel number) corresponding to the maximal intensity');
 legend('Raw data', 'Smooth raw data', 'Fitted data', 'Smooth fitted data');
+title(strcat('Pixel indices (maximal intensity) = f(number of frames)');
 hold off
 saveas(gcf,'Indexmax=f(framenb)','pdf');
 saveas(gcf,'Indexmax=f(framenb)','fig');
-%title(strcat('2D Intensity plot, ', Smoothingmethod,smoothingdegree));
 
 % PLOTTING A FIGURE WITH ONLY A FEW INTENSITY PROFILES (REPRESENTATIVE)
+% * REPRESENTATIVE FRAMES -----------------------------------------------
+LowestFrame = round(10/100*length(Chosenrange));
+MidFrame = round(50/100*length(Chosenrange));
+HighestFrame = round(80/100*length(Chosenrange));
+% * CONVERSION OF FRAME N° INTO TEXT ------------------------------------
+TxtLF = sprintf('%g',LowestFrame); % '%g' allows no trailing zeros when converting number to char
+TxtMF = sprintf('%g',MidFrame);
+TxtHF = sprintf('%g',HighestFrame);
+% * PLOTTING RAW VALUES -------------------------------------------------
 figure()
 hold on
-plot(Chosenfit{30}, Chosenrange{30},FDatamean{1,30})
-plot(Chosenfit{70}, Chosenrange{70},FDatamean{1,70})
-plot(Chosenfit{120}, Chosenrange{120},FDatamean{1,120})
-plot(Chosenfit{170}, Chosenrange{170},FDatamean{1,170})
-plot(Chosenfit{210}, Chosenrange{210},FDatamean{1,210})
-xl1 = xline(FDataindexmax(30),'b:',FDataindexmax(30));
-xl2 = xline(FDataindexmax(70),'b:',FDataindexmax(70));
-xl3 = xline(FDataindexmax(120),'b:',FDataindexmax(120));
-xl4 = xline(FDataindexmax(170),'b:',FDataindexmax(170));
-xl5 = xline(FDataindexmax(210),'b:',FDataindexmax(210));
+plot(X,Datamean{LowestFrame})
+plot(X,Datamean{1,MidFrame})
+plot(X,Datamean{1,HighestFrame})
+xl1 = xline(Dataindexmax(LowestFrame),'b',Dataindexmax(LowestFrame));
+xl2 = xline(Dataindexmax(MidFrame),'k',Dataindexmax(MidFrame));
+xl3 = xline(Dataindexmax(HighestFrame),'c',Dataindexmax(HighestFrame));
 xl1.LabelVerticalAlignment = 'middle';
 xl1.LabelHorizontalAlignment = 'center';
 xl2.LabelVerticalAlignment = 'middle';
 xl2.LabelHorizontalAlignment = 'center';
 xl3.LabelVerticalAlignment = 'middle';
 xl3.LabelHorizontalAlignment = 'center';
-xl4.LabelVerticalAlignment = 'middle';
-xl4.LabelHorizontalAlignment = 'center';
-xl5.LabelVerticalAlignment = 'middle';
-xl5.LabelHorizontalAlignment = 'center';
 xlabel('Frame n°')
 ylabel('Intensity')
-legend('img30','img70','img120','img170','img210')
+legend(strcat('img',TxtLF),strcat('img',TxtMF),strcat('img',TxtHF))
 hold off
+saveas(gcf,strcat('Raw',TxtLF,'-',TxtMF,'-',TxtHF),'pdf');
+saveas(gcf,strcat('Raw',TxtLF,'-',TxtMF,'-',TxtHF),'fig');
+% * PLOTTING FIT VALUES -------------------------------------------------
+figure()
+hold on
+plot(Chosenrange{LowestFrame},FDatamean{1,LowestFrame})
+plot(Chosenrange{MidFrame},FDatamean{1,MidFrame})
+plot(Chosenrange{HighestFrame},FDatamean{1,HighestFrame})
+xl1 = xline(FDataindexmax(LowestFrame),'b',FDataindexmax(LowestFrame));
+xl2 = xline(FDataindexmax(MidFrame),'k',FDataindexmax(MidFrame));
+xl3 = xline(FDataindexmax(HighestFrame),'c',FDataindexmax(HighestFrame));
+xl1.LabelVerticalAlignment = 'middle';
+xl1.LabelHorizontalAlignment = 'center';
+xl2.LabelVerticalAlignment = 'middle';
+xl2.LabelHorizontalAlignment = 'center';
+xl3.LabelVerticalAlignment = 'middle';
+xl3.LabelHorizontalAlignment = 'center';
+xlabel('Frame n°')
+ylabel('Intensity')
+legend(strcat('img',TxtLF),strcat('img',TxtMF),strcat('img',TxtHF))
+hold off
+Rawname = convertCharsToStrings(strcat('Fit',TxtLF,'-',TxtMF,'-',TxtHF));
+saveas(gcf,Rawname,'pdf');
+saveas(gcf,Rawname,'fig');
 
-%% STACKED IMAGE: 2D-profile = equiv. of the average on each xi of the 3D-profile
-% close all
-% 
-% basepath = 'D:\2020-09-11\7. L7 X=-4072 to -4102\2020-09-11_11h15m28s\';
-% Im=imread(strcat(basepath,'SUM_590.jpg'));
-% 
-% %IMAGE SIZE AND DATA RETRIEVING
-% [x,y]=size(Im);
-% %Pixel indices vectors
-% X = 1:x;
-% Y = 1:y;
-% i= im2double(Im); %intensity values
-% Vectors = mat2tiles(i,[1,y]); %cut i into vectors of size [1,y], each of them = 1 horizontal line of the image 
-% 
-% %CALCULATING A MEAN CURVE WITH STD FOR EACH POINT
-% for k = 1:x
-%     Means(k) = mean(Vectors{k,1});
-%     Stds(k) = std(Vectors{k,1});
-% end
-% 
-% % SMOOTHING DATA IF NEEDED
-% Gaussian20_Means = smoothdata(Means,'gaussian',20);
-% Gaussian50_Means = smoothdata(Means,'gaussian',50);
-% Gaussian100_Means = smoothdata(Means,'gaussian',100);
-% figure()
-% hold on
-% title('Means - Gaussian smoothing')
-% plot(X,Means)
-% plot(X,Gaussian20_Means)
-% plot(X,Gaussian50_Means)
-% plot(X,Gaussian100_Means)
-% xlabel('Pixel n°')
-% ylabel('Intensity')
-% legend('Means','Gaussian (20)','Gaussian (50)','Gaussian (100)')
-% hold off
-% saveas(gcf,'SmoothingFIG_Means','pdf');
-% saveas(gcf,'SmoothingFIG_Means','fig');
-% 
-% input_smooth = input('How many points do you want to smooth your data on? \n');
-% if input_smooth == 0
-%     Smoothingmethod = 'None';
-%     Means = Means;
-% else
-%     Smoothingmethod = 'Gaussian';
-%     Means = smoothdata(Means,'gaussian',input_smooth);
-% end
-% smoothingdegree = sprintf('%d',input_smooth);
-%  
-% % Means = smoothdata(Means,'gaussian',100);
-%  
-% % FINDING CORRESPONDING INDICES
-% Globalstd = std(Means); % distribution of mean values
-% Globalmax = max(Means); % maximal mean value
-% % Index of the maximum
-% Indexmax = find(Means==Globalmax);
-% % Index of the std on both sides
-% Minus = Globalmax-Globalstd;
-% [lowvalue, Minusix] = min(abs(Means-Minus));
-% Plusix = Indexmax + (Indexmax-Minusix);
-% 
-% % Plotting intensity =f(dataX)
-% figure()
-% hold on
-% plot(X, Means)
-% xline(Indexmax, 'r', Indexmax);
-% xline(Minusix, 'b:', Minusix);
-% xline(Plusix, 'b:', Plusix);
-% %title(strcat('2D Intensity plot, ', Smoothingmethod,smoothingdegree));
-% hold off
-% saveas(gcf,'2Dplot_mean-and-std','pdf');
-% saveas(gcf,'2Dplot_mean-and-std','fig');
+% SAVING WORKSPACE
+save('Intensityprofile_sequence')
