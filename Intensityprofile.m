@@ -161,7 +161,7 @@ for k=1:numFiles
 end
 xlabel('Frame n°');
 ylabel('Intensity');
-title(strcat('Mean intensity profiles');
+title(strcat('Mean intensity profiles'));
 hold off
 saveas(gcf,'Raw_Meanprofiles','pdf');
 saveas(gcf,'Raw_Meanprofiles','fig');
@@ -175,7 +175,7 @@ for k=1:numFiles
 end
 xlabel('Frame n°');
 ylabel('Intensity');
-title(strcat('Mean intensity profiles');
+title(strcat('Mean intensity profiles'));
 hold off
 saveas(gcf,'Fit_Meanprofiles','pdf');
 saveas(gcf,'Fit_Meanprofiles','fig');
@@ -196,7 +196,7 @@ yline(min(Dataindexmax_smooth),'r',strcat('Left max:',Minsmooth));
 xlabel('Frame n°');
 ylabel('Index (pixel number) corresponding to the maximal intensity');
 legend('Raw data', 'Smooth raw data', 'Fitted data', 'Smooth fitted data');
-title(strcat('Pixel indices (maximal intensity) = f(number of frames)');
+title(strcat('Pixel indices (maximal intensity) = f(number of frames)'));
 hold off
 saveas(gcf,'Indexmax=f(framenb)','pdf');
 saveas(gcf,'Indexmax=f(framenb)','fig');
@@ -255,4 +255,4 @@ saveas(gcf,Rawname,'pdf');
 saveas(gcf,Rawname,'fig');
 
 % SAVING WORKSPACE
-save('Intensityprofile_sequence')
+save('Workspace')
